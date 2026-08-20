@@ -349,9 +349,7 @@ function App() {
       {/* --------------------------------------------- */}
 
       <div style={{ marginTop: "30px" }}>
-        {loading && (
-          <p>Searching Spotify...</p>
-        )}
+        {loading && <p>Searching Spotify...</p>}
 
         {!loading &&
           searched &&
@@ -363,64 +361,74 @@ function App() {
 
         {!loading &&
           tracks.map((track) => (
-            <div
+            <a
               key={track.id}
+              href={`https://open.spotify.com/track/${track.id}`}
+              target="_blank"
+              rel="noopener noreferrer"
               style={{
-                display: "flex",
-                gap: "15px",
-                marginBottom: "20px",
-                padding: "15px",
-                background: "#1a1a1a",
-                borderRadius: "8px",
+                display: "block",
+                textDecoration: "none",
+                color: "inherit",
               }}
             >
-              {/* Album image */}
+              <div
+                style={{
+                  display: "flex",
+                  gap: "15px",
+                  marginBottom: "20px",
+                  padding: "15px",
+                  background: "#1a1a1a",
+                  borderRadius: "8px",
+                  cursor: "pointer",
+                }}
+              >
+                {/* Album image */}
+                {track.album.images &&
+                  track.album.images.length > 0 && (
+                    <img
+                      src={track.album.images[0].url}
+                      alt={track.album.name}
+                      width="100"
+                      height="100"
+                      style={{
+                        objectFit: "cover",
+                        borderRadius: "5px",
+                      }}
+                    />
+                  )}
 
-              {track.album.images &&
-                track.album.images.length > 0 && (
-                  <img
-                    src={track.album.images[0].url}
-                    alt={track.album.name}
-                    width="100"
-                    height="100"
-                    style={{
-                      objectFit: "cover",
-                      borderRadius: "5px",
-                    }}
-                  />
-                )}
+                {/* Track information */}
+                <div>
+                  <h3 style={{ marginTop: 0 }}>
+                    {track.name}
+                  </h3>
 
-              {/* Track information */}
-
-              <div>
-                <h3 style={{ marginTop: 0 }}>
-                  {track.name}
-                </h3>
-
-                <p>
-                  <strong>Artist:</strong>{" "}
-                  {track.artists
-                    .map((artist) => artist.name)
-                    .join(", ")}
-                </p>
-
-                <p>
-                  <strong>Album:</strong>{" "}
-                  {track.album.name}
-                </p>
-
-                <p>
-                  <strong>Released:</strong>{" "}
-                  {track.album.release_date}
-                </p>
-
-                {track.explicit && (
                   <p>
-                    <strong>Explicit:</strong> Yes
+                    <strong>Artist:</strong>{" "}
+                    {track.artists
+                      .map((artist) => artist.name)
+                      .join(", ")}
                   </p>
-                )}
+
+                  <p>
+                    <strong>Album:</strong>{" "}
+                    {track.album.name}
+                  </p>
+
+                  <p>
+                    <strong>Released:</strong>{" "}
+                    {track.album.release_date}
+                  </p>
+
+                  {track.explicit && (
+                    <p>
+                      <strong>Explicit:</strong> Yes
+                    </p>
+                  )}
+                </div>
               </div>
-            </div>
+            </a>
           ))}
       </div>
     </div>
