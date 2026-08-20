@@ -1,4 +1,4 @@
-const API_BASE_URL = 
+const API_BASE_URL =
   import.meta.env.VITE_API_URL || "http://localhost:8000";
 
 export interface SpotifyImage {
@@ -31,6 +31,9 @@ export interface SpotifyTrack {
   album: SpotifyAlbum;
   preview_url: string | null;
 }
+
+// App.tsx expects Track
+export type Track = SpotifyTrack;
 
 export interface SpotifySearchResponse {
   tracks: {
@@ -81,13 +84,11 @@ export async function searchSpotify(
   }
 
   const response = await fetch(
-    `http://localhost:8000/search?${searchParams.toString()}`
+    `${API_BASE_URL}/search?${searchParams.toString()}`
   );
 
   if (!response.ok) {
-    throw new Error(
-      `Search failed: ${response.status}`
-    );
+    throw new Error(`Search failed: ${response.status}`);
   }
 
   return response.json();
