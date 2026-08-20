@@ -11,7 +11,7 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:5173",
         "http://127.0.0.1:5173",
-        "https://spotify-search-y345.onrender.com"
+        "https://optus-56.vercel.app"
     ],
     allow_credentials=True,
     allow_methods=["*"],
