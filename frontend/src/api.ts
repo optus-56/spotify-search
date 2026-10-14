@@ -48,8 +48,10 @@ export interface SearchParams {
   q?: string;
   genre?: string;
   artist?: string;
-  released_from?: number;
-  released_to?: number;
+  /** Year ("2015") or month ("2015-06"). */
+  released_from?: string;
+  /** Year ("2015") or month ("2015-06"). */
+  released_to?: string;
 }
 
 export async function searchSpotify(
@@ -70,17 +72,11 @@ export async function searchSpotify(
   }
 
   if (params.released_from !== undefined) {
-    searchParams.set(
-      "released_from",
-      params.released_from.toString()
-    );
+    searchParams.set("released_from", params.released_from);
   }
 
   if (params.released_to !== undefined) {
-    searchParams.set(
-      "released_to",
-      params.released_to.toString()
-    );
+    searchParams.set("released_to", params.released_to);
   }
 
   const response = await fetch(

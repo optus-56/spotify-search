@@ -1,6 +1,146 @@
 import { useState } from "react";
+import type { CSSProperties } from "react";
 import { searchSpotify } from "./api";
 import type { Track } from "./api";
+
+const MONTH_NAMES = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+];
+
+type MonthValue = { year: number; month: number };
+
+const filterControlStyle: CSSProperties = {
+  padding: "10px",
+  background: "#222",
+  color: "white",
+  border: "1px solid #444",
+  borderRadius: "5px",
+  colorScheme: "dark",
+};
+
+const filterLabelStyle: CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  gap: "4px",
+  fontSize: "12px",
+  color: "#aaa",
+};
+
+/** Value for <input type="month">, e.g. "2026-10". */
+function currentMonthValue(): string {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+}
+
+/** Parse a "YYYY-MM" picker value. */
+function parseMonthValue(value: string): MonthValue | null {
+  const match = /^(\d{4})-(\d{2})$/.exec(value);
+
+  if (!match) {
+    return null;
+  }
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+
+  if (month < 1 || month > 12) {
+    return null;
+  }
+
+  return { year, month };
+}
+
+/**
+ * Split a Spotify release date into year + month. Spotify can return
+ * "2015" (year), "2015-06" (month) or "2015-06-21" (day) precision, so
+ * the month is `null` when we only know the year.
+ */
+function releaseParts(
+  releaseDate: string
+): { year: number; month: number | null } | null {
+  if (!releaseDate) {
+    return null;
+  }
+
+  const [yearPart, monthPart] = releaseDate.split("-");
+  const year = Number(yearPart);
+
+  if (!Number.isInteger(year)) {
+    return null;
+  }
+
+  const month = monthPart ? Number(monthPart) : null;
+
+  if (
+    month !== null &&
+    (!Number.isInteger(month) || month < 1 || month > 12)
+  ) {
+    return null;
+  }
+
+  return { year, month };
+}
+
+/**
+ * True when a release date falls inside the [from, to] month range.
+ * Year-only dates stay inclusive, since we can't rule them out.
+ */
+function isInReleaseRange(
+  releaseDate: string,
+  from: MonthValue | null,
+  to: MonthValue | null
+): boolean {
+  const release = releaseParts(releaseDate);
+
+  if (!release) {
+    return false;
+  }
+
+  const { year, month } = release;
+
+  if (from) {
+    if (year < from.year) {
+      return false;
+    }
+
+    if (year === from.year && month !== null && month < from.month) {
+      return false;
+    }
+  }
+
+  if (to) {
+    if (year > to.year) {
+      return false;
+    }
+
+    if (year === to.year && month !== null && month > to.month) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function formatMonthValue(value: string): string {
+  const parsed = parseMonthValue(value);
+
+  if (!parsed) {
+    return value;
+  }
+
+  return `${MONTH_NAMES[parsed.month - 1]} ${parsed.year}`;
+}
 
 function App() {
   const [query, setQuery] = useState("");
@@ -34,52 +174,29 @@ function App() {
         q: query.trim() || undefined,
         genre: genre || undefined,
         artist: artist.trim() || undefined,
-        released_from: releasedFrom
-          ? Number(releasedFrom)
-          : undefined,
-        released_to: releasedTo
-          ? Number(releasedTo)
-          : undefined,
+        released_from: releasedFrom || undefined,
+        released_to: releasedTo || undefined,
       });
 
       let results = data.tracks.items;
 
       // --------------------------------------------------
-      // Frontend year filtering
+      // Frontend month filtering
+      // Spotify only filters by year, so narrow to the exact
+      // release month here.
       // --------------------------------------------------
 
-      if (releasedFrom || releasedTo) {
-        results = results.filter((track) => {
-          const releaseDate = track.album.release_date;
+      const fromMonth = parseMonthValue(releasedFrom);
+      const toMonth = parseMonthValue(releasedTo);
 
-          if (!releaseDate) {
-            return false;
-          }
-
-          const releaseYear = Number(
-            releaseDate.substring(0, 4)
-          );
-
-          if (Number.isNaN(releaseYear)) {
-            return false;
-          }
-
-          if (
-            releasedFrom &&
-            releaseYear < Number(releasedFrom)
-          ) {
-            return false;
-          }
-
-          if (
-            releasedTo &&
-            releaseYear > Number(releasedTo)
-          ) {
-            return false;
-          }
-
-          return true;
-        });
+      if (fromMonth || toMonth) {
+        results = results.filter((track) =>
+          isInReleaseRange(
+            track.album.release_date,
+            fromMonth,
+            toMonth
+          )
+        );
       }
 
       setTracks(results);
@@ -171,13 +288,7 @@ function App() {
         <select
           value={genre}
           onChange={(e) => setGenre(e.target.value)}
-          style={{
-            padding: "10px",
-            background: "#222",
-            color: "white",
-            border: "1px solid #444",
-            borderRadius: "5px",
-          }}
+          style={filterControlStyle}
         >
           <option value="">All Genres</option>
           <option value="pop">Pop</option>
@@ -202,96 +313,35 @@ function App() {
           value={artist}
           onChange={(e) => setArtist(e.target.value)}
           placeholder="Artist"
-          style={{
-            padding: "10px",
-            width: "180px",
-            background: "#222",
-            color: "white",
-            border: "1px solid #444",
-            borderRadius: "5px",
-          }}
+          style={{ ...filterControlStyle, width: "180px" }}
         />
 
-        {/* Released From */}
+        {/* Released from (month + year) */}
 
-        <select
-          value={releasedFrom}
-          onChange={(e) => {
-            const value = e.target.value;
-            setReleasedFrom(value);
+        <label style={filterLabelStyle}>
+          Released from
+          <input
+            type="month"
+            value={releasedFrom}
+            max={releasedTo || currentMonthValue()}
+            onChange={(e) => setReleasedFrom(e.target.value)}
+            style={filterControlStyle}
+          />
+        </label>
 
-            if (
-              releasedTo &&
-              value &&
-              Number(value) > Number(releasedTo)
-            ) {
-              setReleasedTo("");
-            }
-          }}
-          style={{
-            padding: "10px",
-            background: "#222",
-            color: "white",
-            border: "1px solid #444",
-            borderRadius: "5px",
-          }}
-        >
-          <option value="">Released From</option>
+        {/* Released to (month + year) */}
 
-          {Array.from(
-            { length: new Date().getFullYear() - 1900 + 1 },
-            (_, i) => new Date().getFullYear() - i
-          ).map((year) => (
-            <option key={year} value={year}>
-              {year}
-            </option>
-          ))}
-        </select>
-
-        {/* Released To */}
-
-        <select
-          value={releasedTo}
-          onChange={(e) => {
-            const value = e.target.value;
-
-            if (
-              releasedFrom &&
-              value &&
-              Number(value) < Number(releasedFrom)
-            ) {
-              return;
-            }
-
-            setReleasedTo(value);
-          }}
-          style={{
-            padding: "10px",
-            background: "#222",
-            color: "white",
-            border: "1px solid #444",
-            borderRadius: "5px",
-          }}
-        >
-          <option value="">Released To</option>
-
-          {Array.from(
-            { length: new Date().getFullYear() - 1900 + 1 },
-            (_, i) => new Date().getFullYear() - i
-          ).map((year) => (
-            <option
-              key={year}
-              value={year}
-              disabled={
-                releasedFrom
-                  ? year < Number(releasedFrom)
-                  : false
-              }
-            >
-              {year}
-            </option>
-          ))}
-        </select>
+        <label style={filterLabelStyle}>
+          Released to
+          <input
+            type="month"
+            value={releasedTo}
+            min={releasedFrom || undefined}
+            max={currentMonthValue()}
+            onChange={(e) => setReleasedTo(e.target.value)}
+            style={filterControlStyle}
+          />
+        </label>
 
         {/* Clear */}
 
@@ -337,8 +387,13 @@ function App() {
           {(releasedFrom || releasedTo) && (
             <span>
               Released:{" "}
-              {releasedFrom || "Any"} →{" "}
-              {releasedTo || "Any"}
+              {releasedFrom
+                ? formatMonthValue(releasedFrom)
+                : "Any"}{" "}
+              →{" "}
+              {releasedTo
+                ? formatMonthValue(releasedTo)
+                : "Any"}
             </span>
           )}
         </div>

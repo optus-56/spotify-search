@@ -1,3 +1,5 @@
+import re
+
 from fastapi import FastAPI
 from dotenv import load_dotenv
 from fastapi.middleware.cors import CORSMiddleware
@@ -20,6 +22,26 @@ app.add_middleware(
 
 from app.spotify import spotify_search
 
+_YEAR_RE = re.compile(r"^\s*(\d{4})")
+
+
+def _parse_year(value: str | None) -> int | None:
+    """Accept "2015" or "2015-06" and return the year (or None)."""
+    if value is None:
+        return None
+
+    match = _YEAR_RE.match(str(value))
+
+    if not match:
+        return None
+
+    year = int(match.group(1))
+
+    if year < 1900 or year > 2100:
+        return None
+
+    return year
+
 
 @app.get("/search")
 async def search(
@@ -27,8 +49,8 @@ async def search(
     genre: str | None = None,
     artist: str | None = None,
     year: str | None = None,
-    released_from: int | None = None,
-    released_to: int | None = None,
+    released_from: str | None = None,
+    released_to: str | None = None,
 ):
     parts = []
 
@@ -44,14 +66,25 @@ async def search(
     if year:
         parts.append(f"year:{year}")
 
-    if released_from is not None and released_to is not None:
-        parts.append(f"year:{released_from}-{released_to}")
+    # Spotify's search API only understands year granularity, so we narrow the
+    # query to the span of years and filter down to exact months in the UI.
+    from_year = _parse_year(released_from)
+    to_year = _parse_year(released_to)
 
-    elif released_from is not None:
-        parts.append(f"year:{released_from}-")
+    if from_year is not None and to_year is not None:
+        if from_year > to_year:
+            from_year, to_year = to_year, from_year
 
-    elif released_to is not None:
-        parts.append(f"year:-{released_to}")
+        if from_year == to_year:
+            parts.append(f"year:{from_year}")
+        else:
+            parts.append(f"year:{from_year}-{to_year}")
+
+    elif from_year is not None:
+        parts.append(f"year:{from_year}-")
+
+    elif to_year is not None:
+        parts.append(f"year:-{to_year}")
 
     if not parts:
         return {
